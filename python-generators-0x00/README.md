@@ -1,0 +1,1 @@
+# Generator that streams rows from an SQL database one by one.

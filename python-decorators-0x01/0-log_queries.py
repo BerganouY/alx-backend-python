@@ -5,35 +5,30 @@ Database Query Logger Decorator
 
 import sqlite3
 import functools
-import time
 
 
 def log_queries(func):
     """
-    Decorator that logs SQL queries with timestamps before execution
+    Decorator that logs SQL queries executed by any function
 
     Args:
         func: The function to be decorated
 
     Returns:
-        A wrapped function that logs queries with timestamps
+        A wrapped function that logs queries
     """
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # Extract the query from either args or kwargs
-        query = kwargs.get('query', args[0] if args and isinstance(args[0], str) else None)
+        # Extract query from args or kwargs
+        query = kwargs.get('query', args[0] if args else None)
 
-        # Get current timestamp using time module
-        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-
-        # Log the query with timestamp if found
+        # Log the query if found
         if query:
-            print(f"[{timestamp}] Executing query: {query}")
+            print(f"Executing query: {query}")
         else:
-            print(f"[{timestamp}] Warning: No query detected to log")
+            print("Warning: No query detected to log")
 
-        # Execute the original function
         return func(*args, **kwargs)
 
     return wrapper

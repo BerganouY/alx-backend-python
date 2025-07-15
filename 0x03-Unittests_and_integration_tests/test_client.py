@@ -10,7 +10,6 @@ from fixtures import TEST_PAYLOAD
 
 class TestGithubOrgClient(unittest.TestCase):
     """Test GithubOrgClient class"""
-
     @parameterized.expand([
         ("google",),
         ("abc",)
@@ -68,7 +67,6 @@ class TestGithubOrgClient(unittest.TestCase):
 ])
 class TestIntegrationGithubOrgClient(unittest.TestCase):
     """Integration test for GithubOrgClient"""
-
     @classmethod
     def setUpClass(cls):
         """Set up class with mock patcher"""

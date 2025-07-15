@@ -27,7 +27,7 @@ class TestGithubOrgClient(unittest.TestCase):
     def test_public_repos_url(self):
         """Test _public_repos_url property"""
         with patch('client.GithubOrgClient.org',
-                  new_callable=PropertyMock) as mock_org:
+                   new_callable=PropertyMock) as mock_org:
             mock_org.return_value = {"repos_url": "http://test.url"}
             test_class = GithubOrgClient("test")
             self.assertEqual(test_class._public_repos_url, "http://test.url")
@@ -39,7 +39,7 @@ class TestGithubOrgClient(unittest.TestCase):
         mock_get_json.return_value = test_payload
 
         with patch('client.GithubOrgClient._public_repos_url',
-                  new_callable=PropertyMock) as mock_public_repos_url:
+                   new_callable=PropertyMock) as mock_public_repos_url:
             mock_public_repos_url.return_value = "http://test.url/repos"
             test_class = GithubOrgClient("test")
             result = test_class.public_repos()
@@ -70,7 +70,7 @@ class TestGithubOrgClient(unittest.TestCase):
         mock_get_json.return_value = test_payload
 
         with patch('client.GithubOrgClient._public_repos_url',
-                  new_callable=PropertyMock) as mock_public_repos_url:
+                   new_callable=PropertyMock) as mock_public_repos_url:
             mock_public_repos_url.return_value = "http://test.url/repos"
             test_class = GithubOrgClient("test")
             result = test_class.public_repos(license="apache-2.0")

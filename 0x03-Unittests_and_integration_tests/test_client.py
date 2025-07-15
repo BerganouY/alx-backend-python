@@ -81,10 +81,12 @@ class TestGithubOrgClient(unittest.TestCase):
 
 
 @parameterized_class([
-    {"org_payload": TEST_PAYLOAD[0][0],
-     "repos_payload": TEST_PAYLOAD[0][1],
-     "expected_repos": TEST_PAYLOAD[0][2],
-     "apache2_repos": TEST_PAYLOAD[0][3]}
+    {
+        "org_payload": TEST_PAYLOAD[0][0],
+        "repos_payload": TEST_PAYLOAD[0][1],
+        "expected_repos": TEST_PAYLOAD[0][2],
+        "apache2_repos": TEST_PAYLOAD[0][3]
+    }
 ])
 class TestIntegrationGithubOrgClient(unittest.TestCase):
     """Integration test for GithubOrgClient"""
@@ -96,12 +98,12 @@ class TestIntegrationGithubOrgClient(unittest.TestCase):
         cls.mock_get = cls.get_patcher.start()
 
         def side_effect(url):
-            """Side effect function for mock"""
-            if url.endswith("/orgs/google"):
+            """Side effect function for mock to return correct fixtures"""
+            if url == "https://api.github.com/orgs/google":
                 return Mock(json=lambda: cls.org_payload)
-            elif url.endswith("/orgs/google/repos"):
+            elif url == "https://api.github.com/orgs/google/repos":
                 return Mock(json=lambda: cls.repos_payload)
-            return None
+            return Mock(json=lambda: None)
 
         cls.mock_get.side_effect = side_effect
 

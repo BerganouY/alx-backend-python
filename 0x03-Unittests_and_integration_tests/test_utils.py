@@ -39,7 +39,8 @@ class TestGetJson(unittest.TestCase):
     ])
     @patch('requests.get')
     def test_get_json(self, test_url, test_payload, mock_get):
-        """Test get_json returns expected result without making actual HTTP call"""
+        """Test get_json returns expected result without making actual HTTP call
+        """
         mock_get.return_value = Mock(json=lambda: test_payload)
         result = get_json(test_url)
         mock_get.assert_called_once_with(test_url)

@@ -5,6 +5,9 @@ from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from .models import User, Conversation, Message
 from .serializers import UserSerializer, ConversationSerializer, MessageSerializer
+from .permissions import IsParticipantOfConversation
+from .pagination import MessagePagination
+from .filters import MessageFilter
 
 
 class MessageFilter(filters.FilterSet):
@@ -38,8 +41,8 @@ class UserViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         return self.filter_queryset(queryset)
 
-
 class ConversationViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsParticipantOfConversation]
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
     filter_backends = [filters.DjangoFilterBackend]
@@ -93,6 +96,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.ModelViewSet):
+    pagination_class = MessagePagination
+    filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
+    filterset_class = MessageFilter
+    permission_classes = [IsParticipantOfConversation]
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
     filter_backends = [filters.DjangoFilterBackend]

@@ -1,4 +1,3 @@
-# chats/views.py
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -27,25 +26,32 @@ class ConversationViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.DjangoFilterBackend]
 
     def get_queryset(self):
-        return Conversation.objects.filter(participants=self.request.user)
+        """Only show conversations where user is a participant"""
+        return super().get_queryset().filter(participants=self.request.user)
 
     @action(detail=True, methods=['post'])
-    def send_message(self, request, pk=None):
+    def send_message(self, request, *args, **kwargs):
+        """Send message handled by perform_create in MessageViewSet"""
         conversation = self.get_object()
-        serializer = MessageSerializer(data=request.data)
+        serializer = MessageSerializer(data=request.data, context={
+            'request': request,
+            'conversation': conversation
+        })
         serializer.is_valid(raise_exception=True)
-        serializer.save(sender=request.user, conversation=conversation)
+        serializer.save()
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
-    def messages(self, request, pk=None):
+    def messages(self, request, *args, **kwargs):
+        """Get messages through filtered queryset"""
         conversation = self.get_object()
         messages = MessageFilter(
             request.GET,
             queryset=conversation.messages.all()
         ).qs
-        serializer = MessageSerializer(messages, many=True)
-        return Response(serializer.data)
+        page = self.paginate_queryset(messages)
+        serializer = MessageSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
 
 
 class MessageViewSet(viewsets.ModelViewSet):
@@ -56,13 +62,11 @@ class MessageViewSet(viewsets.ModelViewSet):
     filterset_class = MessageFilter
 
     def get_queryset(self):
+        """Only show messages from conversations where user is a participant"""
         return Message.objects.filter(
             conversation__participants=self.request.user
         )
 
     def perform_create(self, serializer):
-        conversation = get_object_or_404(
-            Conversation,
-            pk=self.request.data.get('conversation')
-        )
+        """Automatically set sender from request user"""
         serializer.save(sender=self.request.user)

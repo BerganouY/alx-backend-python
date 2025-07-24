@@ -1,6 +1,17 @@
 from rest_framework import permissions
 
 
+class IsMessageSender(permissions.BasePermission):
+    """Allow only message sender to modify their messages"""
+
+    def has_object_permission(self, request, view, obj):
+        # Read permissions are allowed to any participant
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Write permissions only allowed to the message sender
+        return obj.sender == request.user
+
 class IsParticipantOfConversation(permissions.BasePermission):
     """
     Custom permission to only allow participants of a conversation to:

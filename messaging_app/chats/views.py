@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from .models import User, Conversation, Message
@@ -33,16 +34,13 @@ class ConversationFilter(filters.FilterSet):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]  # Require authentication for all user operations
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['role', 'email', 'phone_number']
 
-    def get_queryset(self):
-        """Optionally filter users by role if specified in query params"""
-        queryset = super().get_queryset()
-        return self.filter_queryset(queryset)
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsParticipantOfConversation]
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]  # Combined permissions
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
     filter_backends = [filters.DjangoFilterBackend]
@@ -50,24 +48,14 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter conversations to show only those the user participates in"""
-        user = self.request.user
-        if user.is_authenticated:
-            queryset = Conversation.objects.filter(participants=user)
-            return self.filter_queryset(queryset)
-        return Conversation.objects.none()
+        return self.filter_queryset(
+            Conversation.objects.filter(participants=self.request.user)
+        )
 
     @action(detail=True, methods=['post'])
     def send_message(self, request, pk=None):
         """Send a message to a specific conversation"""
         conversation = self.get_object()
-
-        # Check if user is participant in conversation
-        if request.user not in conversation.participants.all():
-            return Response(
-                {'error': 'You are not a participant in this conversation'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         serializer = MessageSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(
@@ -81,14 +69,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
     def messages(self, request, pk=None):
         """Get all messages in a conversation with optional filtering"""
         conversation = self.get_object()
-
-        # Check if user is participant in conversation
-        if request.user not in conversation.participants.all():
-            return Response(
-                {'error': 'You are not a participant in this conversation'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         messages = conversation.messages.all()
         filtered_messages = MessageFilter(request.GET, queryset=messages).qs
         serializer = MessageSerializer(filtered_messages, many=True)
@@ -96,10 +76,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]  # Combined permissions
     pagination_class = MessagePagination
-    filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
-    filterset_class = MessageFilter
-    permission_classes = [IsParticipantOfConversation]
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
     filter_backends = [filters.DjangoFilterBackend]
@@ -107,23 +85,12 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Filter messages to show only those in user's conversations"""
-        user = self.request.user
-        if user.is_authenticated:
-            user_conversations = Conversation.objects.filter(participants=user)
-            queryset = Message.objects.filter(conversation__in=user_conversations)
-            return self.filter_queryset(queryset)
-        return Message.objects.none()
+        return self.filter_queryset(
+            Message.objects.filter(conversation__participants=self.request.user)
+        )
 
     def perform_create(self, serializer):
         """Set the sender to the current user when creating a message"""
         conversation_id = self.request.data.get('conversation')
         conversation = get_object_or_404(Conversation, pk=conversation_id)
-
-        # Check if user is participant in conversation
-        if self.request.user not in conversation.participants.all():
-            return Response(
-                {'error': 'You are not a participant in this conversation'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         serializer.save(sender=self.request.user)

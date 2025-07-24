@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from django_filters import rest_framework as filters
 from .models import User, Conversation, Message
 from .serializers import UserSerializer, ConversationSerializer, MessageSerializer
-from .permissions import IsParticipantOfConversation
+from .permissions import IsParticipantOfConversation, IsMessageSender
 from .pagination import MessagePagination
 from .filters import MessageFilter
 
@@ -34,13 +34,13 @@ class ConversationFilter(filters.FilterSet):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated]  # Require authentication for all user operations
+    permission_classes = [IsAuthenticated]
     filter_backends = [filters.DjangoFilterBackend]
     filterset_fields = ['role', 'email', 'phone_number']
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsParticipantOfConversation]  # Combined permissions
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]
     queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
     filter_backends = [filters.DjangoFilterBackend]
@@ -76,7 +76,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
 
 class MessageViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated, IsParticipantOfConversation]  # Combined permissions
+    permission_classes = [IsAuthenticated, IsMessageSender]
     pagination_class = MessagePagination
     queryset = Message.objects.all()
     serializer_class = MessageSerializer

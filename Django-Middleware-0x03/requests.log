@@ -1,0 +1,5 @@
+2023-11-16 10:15:23,456 - User: Anonymous - Path: /api/auth/login/ - Method: POST
+2023-11-16 10:15:25,789 - User: testuser - Path: /api/conversations/ - Method: GET
+2023-11-16 10:15:30,123 - User: testuser - Path: /api/messages/ - Method: POST
+2023-11-16 10:15:35,456 - User: admin - Path: /api/admin/users/ - Method: GET
+2023-11-16 10:15:40,789 - User: Anonymous - Path: /api/docs/ - Method: GET

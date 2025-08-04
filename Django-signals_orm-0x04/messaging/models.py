@@ -9,24 +9,24 @@ class Message(models.Model):
     receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages')
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
-    edited_at = models.DateTimeField(null=True, blank=True)  # Track when edited
+    edited_at = models.DateTimeField(null=True, blank=True)
     is_edited = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Message {self.id} from {self.sender} to {self.receiver}"
+        return f"Message {self.id} from {self.sender}"
 
-class MessageEditHistory(models.Model):
-    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='edit_history')
+class MessageHistory(models.Model):
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='history')
     old_content = models.TextField()
     edited_at = models.DateTimeField(auto_now_add=True)
     edited_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
 
     class Meta:
         ordering = ['-edited_at']
-        verbose_name_plural = 'Message Edit Histories'
+        verbose_name_plural = 'Message Histories'
 
     def __str__(self):
-        return f"Edit #{self.id} of message {self.message.id}"
+        return f"History for message {self.message.id}"

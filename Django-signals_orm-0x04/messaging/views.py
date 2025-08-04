@@ -1,4 +1,5 @@
-from rest_framework import generics
+from rest_framework import generics, status
+from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
@@ -16,11 +17,7 @@ class MessageCreateView(generics.CreateAPIView):
             Conversation.objects.filter(participants=self.request.user),
             id=conversation_id
         )
-
-        # Get the other participant as the receiver
         receiver = conversation.participants.exclude(id=self.request.user.id).first()
-
-        # Required line: sender=request.user
         serializer.save(sender=self.request.user, receiver=receiver, conversation=conversation)
 
 
@@ -34,7 +31,6 @@ class ConversationMessagesView(generics.ListAPIView):
             Conversation.objects.filter(participants=self.request.user),
             id=conversation_id
         )
-
         return Message.objects.filter(
             conversation=conversation
         ).select_related(
@@ -57,14 +53,20 @@ class MessageReplyView(generics.CreateAPIView):
             Message.objects.filter(conversation__participants=self.request.user),
             id=parent_id
         )
-
-        # Set the original sender of the parent message as the receiver
         receiver = parent_message.sender
-
-        # Required line: sender=request.user
         serializer.save(
             sender=self.request.user,
             receiver=receiver,
             conversation=parent_message.conversation,
             parent_message=parent_message
         )
+
+
+# ✅ New view that includes: user.delete()
+class DeleteUserView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        user.delete()
+        return Response({"detail": "User deleted successfully."}, status=status.HTTP_204_NO_CONTENT)

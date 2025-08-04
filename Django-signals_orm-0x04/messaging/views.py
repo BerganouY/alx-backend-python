@@ -15,7 +15,8 @@ class UnreadMessagesView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Message.unread.for_user(self.request.user)
+        # Using the custom manager with optimized .only() query
+        return Message.unread.unread_for_user(self.request.user)
 
 # Cached conversation messages view
 class ConversationMessagesView(generics.ListAPIView):

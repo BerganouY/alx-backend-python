@@ -1,14 +1,14 @@
 from django.contrib import admin
-from .models import Message, Notification
+from .models import Message, Notification, MessageHistory
 
-@admin.register(Message)
-class MessageAdmin(admin.ModelAdmin):
-    list_display = ('sender', 'receiver', 'timestamp', 'is_read')
-    list_filter = ('is_read', 'timestamp')
-    search_fields = ('content', 'sender__username', 'receiver__username')
+# ... existing admin registrations ...
 
-@admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('user', 'message', 'is_read', 'created_at')
-    list_filter = ('is_read', 'created_at')
-    raw_id_fields = ('user', 'message')
+@admin.register(MessageHistory)
+class MessageHistoryAdmin(admin.ModelAdmin):
+    list_display = ('message', 'changed_at', 'edited_by')
+    list_filter = ('changed_at',)
+    search_fields = ('old_content', 'message__content')
+    readonly_fields = ('message', 'old_content', 'changed_at', 'edited_by')
+
+    def has_add_permission(self, request):
+        return False  # Prevent manual creation of history records

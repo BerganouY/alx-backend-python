@@ -79,3 +79,5 @@ class DeleteUserView(APIView):
         user = request.user
         user.delete()
         return Response({'detail': 'User deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+
+delete_user = DeleteUserView.as_view()

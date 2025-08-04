@@ -22,6 +22,8 @@ class UnreadMessagesManager(models.Manager):
 
 
 class Message(models.Model):
+    objects = models.Manager()  # Default manager
+    unread = UnreadMessagesManager()  # Custom manager for unread messages
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,

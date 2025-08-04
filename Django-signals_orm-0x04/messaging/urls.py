@@ -9,6 +9,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path('messages/unread/', UnreadMessagesView.as_view(), name='unread-messages'),
     path('messages/', MessageCreateView.as_view(), name='message-create'),
     path('conversations/<int:conversation_id>/messages/',
          ConversationMessagesView.as_view(),

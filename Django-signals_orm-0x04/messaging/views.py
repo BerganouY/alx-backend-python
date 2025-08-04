@@ -59,12 +59,11 @@ class MessageReplyView(generics.CreateAPIView):
             Message.objects.filter(conversation__participants=self.request.user),
             id=parent_id
         )
-        serializer.save(
-            sender=self.request.user,
-            receiver=parent_message.sender,
-            conversation=parent_message.conversation,
-            parent_message=parent_message
-        )
+
+        receiver = parent_message.sender
+
+        request = self.request
+        serializer.save(sender=request.user, receiver=receiver, conversation=parent_message.conversation, parent_message=parent_message)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

@@ -4,23 +4,37 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
+from django.views.decorators.cache import cache_page
+from rest_framework.decorators import api_view, permission_classes
 from .models import Message, Conversation, User
 from .serializers import MessageSerializer
 
+# Custom manager usage example
+class UnreadMessagesView(generics.ListAPIView):
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
 
-# Recursive reply fetcher
-def get_threaded_replies(message):
-    replies = []
-    for reply in message.replies.all().select_related('sender'):
-        replies.append({
-            'id': reply.id,
-            'sender': reply.sender.username,
-            'content': reply.content,
-            'timestamp': reply.timestamp,
-            'replies': get_threaded_replies(reply)
-        })
-    return replies
+    def get_queryset(self):
+        return Message.unread.for_user(self.request.user)
 
+# Cached conversation messages view
+class ConversationMessagesView(generics.ListAPIView):
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    @cache_page(60)
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def get_queryset(self):
+        conversation_id = self.kwargs['conversation_id']
+        conversation = get_object_or_404(
+            Conversation.objects.filter(participants=self.request.user),
+            id=conversation_id
+        )
+        return Message.objects.filter(
+            conversation=conversation
+        ).select_related('sender', 'receiver')
 
 class MessageCreateView(generics.CreateAPIView):
     serializer_class = MessageSerializer
@@ -32,36 +46,8 @@ class MessageCreateView(generics.CreateAPIView):
             Conversation.objects.filter(participants=self.request.user),
             id=conversation_id
         )
-
         receiver = conversation.participants.exclude(id=self.request.user.id).first()
-
-        request = self.request
-        serializer.save(sender=request.user, receiver=receiver, conversation=conversation)
-
-
-class ConversationMessagesView(generics.ListAPIView):
-    serializer_class = MessageSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        conversation_id = self.kwargs['conversation_id']
-        conversation = get_object_or_404(
-            Conversation.objects.filter(participants=self.request.user),
-            id=conversation_id
-        )
-
-        return Message.objects.filter(
-            conversation=conversation,
-            parent_message__isnull=True
-        ).select_related(
-            'sender', 'receiver', 'conversation'
-        ).prefetch_related(
-            Prefetch(
-                'replies',
-                queryset=Message.objects.select_related('sender', 'receiver')
-            )
-        ).order_by('timestamp')
-
+        serializer.save(sender=self.request.user, receiver=receiver, conversation=conversation)
 
 class MessageReplyView(generics.CreateAPIView):
     serializer_class = MessageSerializer
@@ -73,33 +59,19 @@ class MessageReplyView(generics.CreateAPIView):
             Message.objects.filter(conversation__participants=self.request.user),
             id=parent_id
         )
-
-        receiver = parent_message.sender
-
-        request = self.request
-        serializer.save(sender=request.user, receiver=receiver, conversation=parent_message.conversation, parent_message=parent_message)
-
-
-class ThreadedMessageView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, message_id):
-        message = get_object_or_404(
-            Message.objects.select_related('sender').prefetch_related('replies'),
-            id=message_id,
-            conversation__participants=request.user
+        serializer.save(
+            sender=self.request.user,
+            receiver=parent_message.sender,
+            conversation=parent_message.conversation,
+            parent_message=parent_message
         )
 
-        data = {
-            'id': message.id,
-            'sender': message.sender.username,
-            'content': message.content,
-            'timestamp': message.timestamp,
-            'replies': get_threaded_replies(message)
-        }
-
-        return Response(data)
-
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+@cache_page(60)
+def unread_messages_count(request):
+    count = Message.unread.for_user(request.user).count()
+    return Response({'unread_count': count})
 
 class DeleteUserView(APIView):
     permission_classes = [IsAuthenticated]
@@ -108,6 +80,3 @@ class DeleteUserView(APIView):
         user = request.user
         user.delete()
         return Response({'detail': 'User deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
-
-
-delete_user = DeleteUserView.as_view()

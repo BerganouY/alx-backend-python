@@ -4,6 +4,23 @@ from django.utils import timezone
 
 User = get_user_model()
 
+
+class Conversation(models.Model):
+    participants = models.ManyToManyField(User, related_name='conversations')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Conversation {self.id}"
+
+
+class UnreadMessagesManager(models.Manager):
+    def for_user(self, user):
+        return self.filter(
+            receiver=user,
+            is_read=False
+        ).only('id', 'content', 'sender', 'timestamp')
+
+
 class Message(models.Model):
     conversation = models.ForeignKey(
         Conversation,
@@ -15,6 +32,11 @@ class Message(models.Model):
         on_delete=models.CASCADE,
         related_name='sent_messages'
     )
+    receiver = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='received_messages'
+    )
     parent_message = models.ForeignKey(
         'self',
         on_delete=models.CASCADE,
@@ -25,22 +47,21 @@ class Message(models.Model):
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read = models.BooleanField(default=False)
+    edited_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    unread = UnreadMessagesManager()
 
     class Meta:
         ordering = ['timestamp']
 
     def __str__(self):
-        return f"Message {self.id} in conversation {self.conversation.id}"
+        return f"Message {self.id} from {self.sender} to {self.receiver}"
 
-    @property
-    def thread_depth(self):
-        """Calculate how deep this message is in a thread"""
-        depth = 0
-        parent = self.parent_message
-        while parent is not None:
-            depth += 1
-            parent = parent.parent_message
-        return depth
+    def mark_as_read(self):
+        self.is_read = True
+        self.save()
+
 
 class MessageHistory(models.Model):
     message = models.ForeignKey(
@@ -57,8 +78,8 @@ class MessageHistory(models.Model):
     )
 
     class Meta:
-        verbose_name_plural = 'Message Histories'
         ordering = ['-edited_at']
+        verbose_name_plural = 'Message Histories'
 
     def __str__(self):
         return f"Edit of message {self.message.id} at {self.edited_at}"

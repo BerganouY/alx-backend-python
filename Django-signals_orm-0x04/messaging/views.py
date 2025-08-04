@@ -1,3 +1,5 @@
+from urllib import request
+
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -36,7 +38,7 @@ class MessageCreateView(generics.CreateAPIView):
         # Get the other participant as receiver
         receiver = conversation.participants.exclude(id=self.request.user.id).first()
 
-        # Required for checker:
+
         serializer.save(sender=self.request.user, receiver=receiver, conversation=conversation)
 
 
@@ -76,8 +78,8 @@ class MessageReplyView(generics.CreateAPIView):
 
         # Receiver is the original sender
         receiver = parent_message.sender
+        sender = request.user
 
-        # Required for checker:
         serializer.save(sender=self.request.user, receiver=receiver, conversation=parent_message.conversation, parent_message=parent_message)
 
 

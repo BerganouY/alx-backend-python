@@ -18,8 +18,14 @@ class MessageCreateView(generics.CreateAPIView):
             id=conversation_id
         )
 
-        # Explicitly set sender to current user
-        serializer.save(sender=self.request.user, conversation=conversation)
+        # Infer receiver as the other participant
+        receiver = conversation.participants.exclude(id=self.request.user.id).first()
+
+        serializer.save(
+            sender=self.request.user,
+            receiver=receiver,
+            conversation=conversation
+        )
 
 
 class ConversationMessagesView(generics.ListAPIView):
@@ -33,17 +39,15 @@ class ConversationMessagesView(generics.ListAPIView):
             id=conversation_id
         )
 
-        # Optimized query with select_related and prefetch_related
         return Message.objects.filter(
             conversation=conversation
         ).select_related(
-            'sender',  # Join sender user data
-            'conversation'  # Join conversation data
+            'sender', 'receiver', 'conversation'
         ).prefetch_related(
             Prefetch(
                 'replies',
-                queryset=Message.objects.select_related('sender')
-            )  # Optimize nested replies
+                queryset=Message.objects.select_related('sender', 'receiver')
+            )
         ).order_by('timestamp')
 
 
@@ -58,9 +62,12 @@ class MessageReplyView(generics.CreateAPIView):
             id=parent_id
         )
 
-        # Explicitly set sender to current user
+        # Infer receiver: replying to sender of parent message
+        receiver = parent_message.sender
+
         serializer.save(
             sender=self.request.user,
+            receiver=receiver,
             conversation=parent_message.conversation,
             parent_message=parent_message
         )

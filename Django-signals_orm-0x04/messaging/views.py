@@ -1,5 +1,4 @@
-from rest_framework import generics, status
-from rest_framework.response import Response
+from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
@@ -18,14 +17,11 @@ class MessageCreateView(generics.CreateAPIView):
             id=conversation_id
         )
 
-        # Infer receiver as the other participant
+        # Get the other participant as the receiver
         receiver = conversation.participants.exclude(id=self.request.user.id).first()
 
-        serializer.save(
-            sender=self.request.user,
-            receiver=receiver,
-            conversation=conversation
-        )
+        # Required line: sender=request.user
+        serializer.save(sender=self.request.user, receiver=receiver, conversation=conversation)
 
 
 class ConversationMessagesView(generics.ListAPIView):
@@ -62,9 +58,10 @@ class MessageReplyView(generics.CreateAPIView):
             id=parent_id
         )
 
-        # Infer receiver: replying to sender of parent message
+        # Set the original sender of the parent message as the receiver
         receiver = parent_message.sender
 
+        # Required line: sender=request.user
         serializer.save(
             sender=self.request.user,
             receiver=receiver,

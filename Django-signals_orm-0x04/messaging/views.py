@@ -13,13 +13,26 @@ class MessageCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         conversation_id = self.request.data.get('conversation')
-        conversation = get_object_or_404(
-            Conversation.objects.filter(participants=self.request.user),
-            id=conversation_id
-        )
+        receiver_id = self.request.data.get('receiver')
 
-        # Automatically set the sender to current user
-        serializer.save(sender=self.request.user, conversation=conversation)
+        # Get or create conversation
+        if conversation_id:
+            conversation = get_object_or_404(
+                Conversation.objects.filter(participants=self.request.user),
+                id=conversation_id
+            )
+        else:
+            # Create new conversation if needed
+            receiver = get_object_or_404(User, id=receiver_id)
+            conversation = Conversation.objects.create()
+            conversation.participants.add(self.request.user, receiver)
+
+        # Explicitly set both sender and receiver
+        serializer.save(
+            sender=self.request.user,
+            receiver=receiver if not conversation_id else None,
+            conversation=conversation
+        )
 
 
 class ConversationMessagesView(generics.ListAPIView):
@@ -33,34 +46,31 @@ class ConversationMessagesView(generics.ListAPIView):
             id=conversation_id
         )
 
-        # Optimized query with select_related and prefetch_related
+        # Optimized query with sender, receiver, and replies
         return Message.objects.filter(
             conversation=conversation
         ).select_related(
-            'sender',  # Join sender user data
-            'conversation'  # Join conversation data
+            'sender',  # Optimize sender lookups
+            'receiver',  # Optimize receiver lookups
+            'conversation'  # Optimize conversation lookups
         ).prefetch_related(
             Prefetch(
                 'replies',
-                queryset=Message.objects.select_related('sender')
+                queryset=Message.objects.select_related('sender', 'receiver')
             )  # Optimize nested replies
         ).order_by('timestamp')
 
 
-class MessageReplyView(generics.CreateAPIView):
+class MessageDetailView(generics.RetrieveAPIView):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        parent_id = self.kwargs['parent_id']
-        parent_message = get_object_or_404(
-            Message.objects.filter(conversation__participants=self.request.user),
-            id=parent_id
-        )
-
-        # Automatically set sender and conversation from parent
-        serializer.save(
-            sender=self.request.user,
-            conversation=parent_message.conversation,
-            parent_message=parent_message
+    def get_queryset(self):
+        return Message.objects.filter(
+            conversation__participants=self.request.user
+        ).select_related(
+            'sender',
+            'receiver',
+            'conversation',
+            'parent_message'
         )

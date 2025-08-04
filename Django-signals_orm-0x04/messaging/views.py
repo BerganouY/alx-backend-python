@@ -3,11 +3,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch
-from .models import Message, Conversation
+from .models import Message, Conversation, User
 from .serializers import MessageSerializer
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
 
 
 class MessageCreateView(generics.CreateAPIView):
@@ -21,11 +18,8 @@ class MessageCreateView(generics.CreateAPIView):
             id=conversation_id
         )
 
-        # Explicitly set the sender to the current user
-        serializer.save(
-            sender=self.request.user,  # This is the key line that was missing
-            conversation=conversation
-        )
+        # Automatically set the sender to current user
+        serializer.save(sender=self.request.user, conversation=conversation)
 
 
 class ConversationMessagesView(generics.ListAPIView):
@@ -39,24 +33,17 @@ class ConversationMessagesView(generics.ListAPIView):
             id=conversation_id
         )
 
-        # Optimized query using select_related and prefetch_related
+        # Optimized query with select_related and prefetch_related
         return Message.objects.filter(
             conversation=conversation
         ).select_related(
-            'sender',  # Optimizes sender lookups
-            'conversation',  # Optimizes conversation lookups
-            'parent_message__sender'  # Optimizes parent message sender lookups
+            'sender',  # Join sender user data
+            'conversation'  # Join conversation data
         ).prefetch_related(
             Prefetch(
                 'replies',
                 queryset=Message.objects.select_related('sender')
-                .prefetch_related(
-                    Prefetch(
-                        'replies',
-                        queryset=Message.objects.select_related('sender')
-                    )
-                )
-            )
+            )  # Optimize nested replies
         ).order_by('timestamp')
 
 
@@ -71,9 +58,9 @@ class MessageReplyView(generics.CreateAPIView):
             id=parent_id
         )
 
-        # Explicitly set the sender to the current user
+        # Automatically set sender and conversation from parent
         serializer.save(
-            sender=self.request.user,  # This is the key line that was missing
+            sender=self.request.user,
             conversation=parent_message.conversation,
             parent_message=parent_message
         )

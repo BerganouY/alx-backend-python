@@ -5,26 +5,42 @@ from django.utils import timezone
 User = get_user_model()
 
 class Message(models.Model):
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
     sender = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='sent_messages'
     )
-    receiver = models.ForeignKey(
-        User,
+    parent_message = models.ForeignKey(
+        'self',
         on_delete=models.CASCADE,
-        related_name='received_messages'
+        null=True,
+        blank=True,
+        related_name='replies'
     )
     content = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)  # Added timestamp field
-    edited_at = models.DateTimeField(null=True, blank=True)
-    is_edited = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
 
     class Meta:
-        ordering = ['-timestamp']  # Order by timestamp
+        ordering = ['timestamp']
 
     def __str__(self):
-        return f"Message from {self.sender} to {self.receiver} at {self.timestamp}"
+        return f"Message {self.id} in conversation {self.conversation.id}"
+
+    @property
+    def thread_depth(self):
+        """Calculate how deep this message is in a thread"""
+        depth = 0
+        parent = self.parent_message
+        while parent is not None:
+            depth += 1
+            parent = parent.parent_message
+        return depth
 
 class MessageHistory(models.Model):
     message = models.ForeignKey(

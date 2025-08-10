@@ -26,6 +26,7 @@ RUN python manage.py collectstatic --noinput
 
 # Expose the port Django runs on
 EXPOSE 8000
+# Run with: docker run -p 8000:8000 messaging_app
 
 # Command to run the application
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "messaging_app.wsgi:application"]

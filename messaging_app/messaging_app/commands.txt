@@ -1,0 +1,50 @@
+# Commands for setting up Kubernetes Ingress
+
+# 1. Enable Ingress addon in minikube
+minikube addons enable ingress
+
+# 2. Verify Ingress controller is running
+kubectl get pods -n ingress-nginx
+
+# 3. Apply the Ingress configuration
+kubectl apply -f ingress.yaml
+
+# 4. Verify Ingress resource is created
+kubectl get ingress
+
+# 5. Describe Ingress for detailed information
+kubectl describe ingress django-messaging-ingress
+
+# 6. Get Ingress IP address
+kubectl get ingress django-messaging-ingress
+
+# 7. Add entries to /etc/hosts for local testing (run with sudo)
+echo "$(minikube ip) messaging.local" | sudo tee -a /etc/hosts
+echo "$(minikube ip) api.messaging.local" | sudo tee -a /etc/hosts
+
+# 8. Test Ingress connectivity
+curl http://messaging.local/
+curl http://messaging.local/api/
+curl http://api.messaging.local/
+
+# 9. Check Ingress logs for troubleshooting
+kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
+
+# 10. Delete Ingress (if needed)
+# kubectl delete ingress django-messaging-ingress
+
+# 11. Alternative: Use kubectl port-forward to test locally
+# kubectl port-forward service/ingress-nginx-controller -n ingress-nginx 8080:80
+
+# 12. Monitor Ingress controller status
+kubectl get all -n ingress-nginx
+
+# 13. Check if Ingress controller service is ready
+kubectl get service -n ingress-nginx
+
+# 14. For TLS/SSL setup, install cert-manager (optional)
+# kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.yaml
+
+# 15. Verify hosts resolution (optional)
+# nslookup messaging.local
+# nslookup api.messaging.local

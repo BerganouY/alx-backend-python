@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-messaging-app
+  labels:
+    app: django-messaging-app
+    version: "1.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: django-messaging-app
+  template:
+    metadata:
+      labels:
+        app: django-messaging-app
+        version: "1.0"
+    spec:
+      containers:
+      - name: django-app
+        image: your-registry/django-messaging-app:1.0
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DEBUG
+          value: "False"
+        - name: ALLOWED_HOSTS
+          value: "*"
+        - name: DATABASE_URL
+          value: "sqlite:///db.sqlite3"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: static-files
+          mountPath: /app/staticfiles
+      volumes:
+      - name: static-files
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-messaging-service
+  labels:
+    app: django-messaging-app
+spec:
+  selector:
+    app: django-messaging-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: django-config
+data:
+  DEBUG: "False"
+  ALLOWED_HOSTS: "*"
+  DATABASE_URL: "sqlite:///db.sqlite3"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: django-secrets
+type: Opaque
+data:
+  SECRET_KEY: ZGphbmdvLXNlY3JldC1rZXktZm9yLXByb2R1Y3Rpb24=  # base64 encoded
+  DATABASE_PASSWORD: cGFzc3dvcmQ=  # base64 encoded "password"

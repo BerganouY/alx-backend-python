@@ -1,0 +1,159 @@
+#!/bin/bash
+
+# kubctl-0x02 - Blue-Green Deployment Script
+# This script manages blue-green deployments for the Django messaging app
+
+echo "🔵🟢 Starting Blue-Green Deployment Process..."
+
+# Function to check deployment health
+check_deployment_health() {
+    local deployment_name=$1
+    local version=$2
+
+    echo "🔍 Checking health of $deployment_name ($version version)..."
+
+    # Wait for deployment to be ready
+    kubectl rollout status deployment/$deployment_name --timeout=300s
+
+    if [ $? -eq 0 ]; then
+        echo "✅ $deployment_name is ready"
+
+        # Check pod logs for errors
+        echo "📋 Checking logs for errors..."
+        kubectl logs -l app=django-messaging-app,version=$version --tail=50 | grep -i error || echo "No errors found in logs"
+
+        return 0
+    else
+        echo "❌ $deployment_name failed to become ready"
+        return 1
+    fi
+}
+
+# Function to switch traffic
+switch_traffic() {
+    local from_version=$1
+    local to_version=$2
+
+    echo "🔄 Switching traffic from $from_version to $to_version..."
+
+    # Update the active service to point to new version
+    kubectl patch service django-messaging-service-active -p '{"spec":{"selector":{"version":"'$to_version'"}}}'
+
+    # Update load balancer service
+    kubectl patch service django-messaging-loadbalancer -p '{"spec":{"selector":{"version":"'$to_version'"}}}'
+
+    echo "✅ Traffic switched to $to_version version"
+}
+
+# Step 1: Deploy Blue version (current stable version)
+echo "🔵 Deploying Blue version..."
+kubectl apply -f blue_deployment.yaml
+
+# Step 2: Deploy Services
+echo "🌐 Deploying services..."
+kubectl apply -f kubeservice.yaml
+
+# Step 3: Check Blue deployment health
+if ! check_deployment_health "django-messaging-app-blue" "blue"; then
+    echo "❌ Blue deployment failed. Exiting..."
+    exit 1
+fi
+
+# Step 4: Deploy Green version (new version)
+echo "🟢 Deploying Green version..."
+kubectl apply -f green_deployment.yaml
+
+# Step 5: Check Green deployment health
+if ! check_deployment_health "django-messaging-app-green" "green"; then
+    echo "❌ Green deployment failed. Rolling back..."
+    kubectl delete deployment django-messaging-app-green
+    exit 1
+fi
+
+# Step 6: Test Green version internally
+echo "🧪 Testing Green version..."
+kubectl port-forward service/django-messaging-service-green 9000:80 &
+GREEN_PORT_FORWARD_PID=$!
+
+sleep 5
+
+# Perform health checks on green version
+GREEN_HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:9000/health/ || echo "000")
+
+if [ "$GREEN_HEALTH_CHECK" = "200" ]; then
+    echo "✅ Green version health check passed"
+else
+    echo "❌ Green version health check failed (HTTP $GREEN_HEALTH_CHECK)"
+    kill $GREEN_PORT_FORWARD_PID 2>/dev/null
+    echo "Rolling back green deployment..."
+    kubectl delete deployment django-messaging-app-green
+    exit 1
+fi
+
+kill $GREEN_PORT_FORWARD_PID 2>/dev/null
+
+# Step 7: Gradual traffic switching simulation
+echo "🔄 Starting gradual traffic switch..."
+
+# Switch 100% traffic to green (in production, you might do this gradually)
+switch_traffic "blue" "green"
+
+# Step 8: Monitor the switch
+echo "📊 Monitoring the deployment switch..."
+sleep 10
+
+# Check if green pods are receiving traffic and functioning properly
+kubectl get pods -l app=django-messaging-app,version=green -o wide
+kubectl get pods -l app=django-messaging-app,version=blue -o wide
+
+# Step 9: Verify the switch was successful
+echo "🔍 Verifying traffic switch..."
+kubectl port-forward service/django-messaging-service-active 8080:80 &
+ACTIVE_PORT_FORWARD_PID=$!
+
+sleep 5
+
+ACTIVE_VERSION_CHECK=$(curl -s http://localhost:8080/ | grep -o "green\|blue" | head -1 || echo "unknown")
+echo "Current active version: $ACTIVE_VERSION_CHECK"
+
+kill $ACTIVE_PORT_FORWARD_PID 2>/dev/null
+
+if [ "$ACTIVE_VERSION_CHECK" = "green" ]; then
+    echo "✅ Successfully switched to Green version"
+
+    # Optional: Scale down blue deployment to save resources
+    echo "📉 Scaling down Blue deployment..."
+    kubectl scale deployment django-messaging-app-blue --replicas=1
+
+    echo "🟢 Blue-Green deployment completed successfully!"
+    echo "Green version is now serving traffic"
+    echo "Blue version is kept running with 1 replica for quick rollback if needed"
+
+else
+    echo "⚠️  Traffic switch verification inconclusive. Manual verification recommended."
+fi
+
+# Step 10: Show final status
+echo "📊 Final deployment status:"
+echo "Blue deployment:"
+kubectl get deployment django-messaging-app-blue -o wide
+
+echo "Green deployment:"
+kubectl get deployment django-messaging-app-green -o wide
+
+echo "Active service:"
+kubectl describe service django-messaging-service-active
+
+# Step 11: Log summary
+echo "📋 Deployment logs summary:"
+echo "Blue version logs:"
+kubectl logs -l app=django-messaging-app,version=blue --tail=10
+
+echo "Green version logs:"
+kubectl logs -l app=django-messaging-app,version=green --tail=10
+
+echo "🎉 Blue-Green deployment process completed!"
+echo "📝 Next steps:"
+echo "  - Monitor green version performance"
+echo "  - If issues occur, run: kubectl patch service django-messaging-service-active -p '{\"spec\":{\"selector\":{\"version\":\"blue\"}}}'"
+echo "  - If green is stable, delete blue: kubectl delete deployment django-messaging-app-blue"

@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# kurbeScript - Kubernetes Setup and Verification Script
+# This script starts a Kubernetes cluster, verifies it's running, and retrieves available pods
+
+echo "🚀 Starting Kubernetes cluster setup..."
+
+# Check if minikube is installed
+if ! command -v minikube &> /dev/null; then
+    echo "❌ Error: minikube is not installed. Please install minikube first."
+    echo "Installation instructions: https://minikube.sigs.k8s.io/docs/start/"
+    exit 1
+fi
+
+# Check if kubectl is installed
+if ! command -v kubectl &> /dev/null; then
+    echo "❌ Error: kubectl is not installed. Please install kubectl first."
+    exit 1
+fi
+
+echo "✅ minikube and kubectl are installed"
+
+# Start minikube cluster
+echo "📦 Starting minikube cluster..."
+minikube start --driver=docker
+
+# Check if cluster started successfully
+if [ $? -eq 0 ]; then
+    echo "✅ Minikube cluster started successfully"
+else
+    echo "❌ Failed to start minikube cluster"
+    exit 1
+fi
+
+# Verify cluster is running using kubectl cluster-info
+echo "🔍 Verifying cluster information..."
+kubectl cluster-info
+
+# Check if cluster-info command was successful
+if [ $? -eq 0 ]; then
+    echo "✅ Cluster is running and accessible"
+else
+    echo "❌ Cluster verification failed"
+    exit 1
+fi
+
+# Get cluster status
+echo "📊 Cluster status:"
+kubectl get nodes
+
+# Retrieve available pods
+echo "🔍 Retrieving available pods..."
+kubectl get pods --all-namespaces
+
+# Additional cluster information
+echo "📋 Additional cluster information:"
+echo "Kubernetes version:"
+kubectl version --client --short
+
+echo "Minikube status:"
+minikube status
+
+echo "🎉 Kubernetes setup completed successfully!"
+echo "Your cluster is ready for deployments."
+
+# Optional: Enable useful addons
+echo "🔧 Enabling useful minikube addons..."
+minikube addons enable dashboard
+minikube addons enable metrics-server
+minikube addons enable ingress
+
+echo "✅ Setup complete! You can now deploy applications to your Kubernetes cluster."

@@ -10,19 +10,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Checking out code from GitHub...'
-                checkout scm
-            }
-        }
-
-        stage('Setup Python Environment') {
-            steps {
-                echo 'Setting up Python environment...'
-                sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                '''
+                git branch: 'main', credentialsId: 'github-credentials', url: 'https://github.com/your-username/alx-backend-python.git'
             }
         }
 
@@ -30,9 +18,12 @@ pipeline {
             steps {
                 echo 'Installing project dependencies...'
                 sh '''
+                    python3 -m venv venv
                     . venv/bin/activate
-                    pip install pytest pytest-django pytest-cov
-                    pip install flake8
+                    pip3 install --upgrade pip
+                    pip3 install -r messaging_app/requirements.txt
+                    pip3 install pytest pytest-django pytest-cov
+                    pip3 install flake8
                 '''
             }
         }
